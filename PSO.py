@@ -1,11 +1,3 @@
-import numpy as np
-import random
-import math
-import copy
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D
-from sklearn.decomposition import TruncatedSVD
-
 class PSO:
     def __init__(self, input_space, num_clusters = 5, n_components = 3, num_particles = 3, iterations = 100):
         assert(num_clusters>0)
@@ -112,10 +104,21 @@ class PSO:
             for j in range(self.num_particles):
                 new_position = curr_position[j] + curr_velocity[j]
                 new_velocity = w*curr_velocity[j] + self.c1*self.r1*(self.local_solution[j] - curr_position[j]) + self.c2*self.r2*(self.global_solution - curr_position[j])
+                for k in range(self.num_clusters):
+                    for l in range(self.n_components):
+                        if(new_position[k][l]>self.component_limit_max[l]):
+                            new_position[k][l] = self.component_limit_max[l]
+                        elif(new_position[k][l]<self.component_limit_min[l]):
+                            new_position[k][l] = self.component_limit_min[l]
+                        if(new_velocity[k][l]>self.velocity_limit_max[l]):
+                            new_velocity[k][l] = self.velocity_limit_max[l]
+                        elif(new_velocity[k][l]<self.velocity_limit_min[l]):
+                            new_velocity[k][l] = self.velocity_limit_min[l]
                 X = [[] for _ in range(self.num_clusters)]
                 for k in range(len(self.input_space)):
-                    distances = np.sum(np.square(new_position - self.input_space[k]),axis = 1)
-                    X[np.argmin(distances)].append(self.input_space[k])
+                    distances = np.divide(np.sum((new_position * self.input_space[k]), axis = 1), np.dot(np.sqrt(np.sum(np.square(new_position), axis = 1)), np.sqrt(np.sum(np.square(self.input_space[k])))))
+                    # distances = np.sum(np.square(new_position - self.input_space[k]),axis = 1)
+                    X[np.argmax(distances)].append(self.input_space[k])
                 for k in range(self.num_clusters):
                     if len(X[k])==0:
                         for l in range(self.num_clusters):
@@ -132,7 +135,8 @@ class PSO:
                 #     print()
                 if new_fitness > self.local_best[j]:
                     print("Updated particle best...")
-                    self.local_solution[j] = copy.deepcopy(new_position)
+                    # self.local_solution[j] = copy.deepcopy(new_position)
+                    self.local_solution[j] = copy.deepcopy(curr_position[j])
                     self.local_best[j] = new_fitness
             for j in range(self.num_particles):
                 index = -1
@@ -142,13 +146,18 @@ class PSO:
                 if index != -1:
                     print("Global value updated")
                     self.global_solution = copy.deepcopy(self.local_solution[index])
+        
+    def plot(self):
         X = [[] for _ in range(self.num_clusters)]
         for k in range(len(self.input_space)):
-            distances = np.sum(np.square(self.global_solution - self.input_space[k]),axis = 1)
-            X[np.argmin(distances)].append(self.input_space[k])
+            distances = np.divide(np.sum((self.global_solution * self.input_space[k]), axis = 1), np.dot(np.sqrt(np.sum(np.square(self.global_solution), axis = 1)), np.sqrt(np.sum(np.square(self.input_space[k])))))
+            # distances = np.sum(np.square(self.global_solution - self.input_space[k]),axis = 1)
+            X[np.argmax(distances)].append(self.input_space[k])
         fig=plt.figure()
         ax = Axes3D(fig)
         colors=['r','m','y','k','c','b','g']
         for i in range(self.num_clusters):
             for j in range(len(X[i])):
                 ax.scatter(X[i][j][0], X[i][j][1], X[i][j][2], color = colors[i], marker = 'o')
+        for i in range(self.num_clusters):
+            ax.scatter(self.global_solution[i][0],self.global_solution[i][1],self.global_solution[i][2],c='b',marker='X')
