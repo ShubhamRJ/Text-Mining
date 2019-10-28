@@ -4,6 +4,7 @@ import math
 import copy
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
+from sklearn.decomposition import TruncatedSVD
 
 class PSO:
     def __init__(self, input_space, num_clusters = 5, n_components = 3, num_particles = 3, iterations = 100):
@@ -22,23 +23,37 @@ class PSO:
 
     def distance(self, X1, X2, type = "euclidean"):
         assert(len(X1)==len(X2))
-        assert(len(X1)==self.n_components)
         X1 = np.array(X1)
         X2 = np.array(X2)
         if(type=="euclidean"):
             return np.sqrt(np.sum(np.square(X1-X2)))
+        if type=="cosine":
+            return np.sum(X1 * X2)/(np.sqrt(np.sum(np.square(X1))) * np.sqrt(np.sum(np.square(X2))))
     
     def fitness(self, X, particle):
         assert(len(X)==self.num_clusters)
         assert(len(X[0][0])==self.n_components)
         assert(len(particle)==self.num_clusters)
         assert(len(particle[0])==self.n_components)
-        X = np.array(X)
-        particle = np.array(particle)
+        # X = np.array(X)
+        # particle = np.array(particle)
+        # Jc = 0
+        # for i in range(self.num_clusters):
+        #     Jc += np.sum(np.sqrt(np.sum(np.square(particle[i] - X[i]), axis = 1)))
+        # return 1/(1+Jc)
+        svd = TruncatedSVD(n_components = self.n_components - 1)
+        U = []
+        for i in range(self.num_clusters):
+            U.append(svd.fit_transform(X[i]))
         Jc = 0
         for i in range(self.num_clusters):
-            Jc += np.sum(np.sqrt(np.sum(np.square(particle[i] - X[i]), axis = 1)))
-        return 1/(1+Jc)
+            for j in range(i+1, self.num_clusters):
+                if(len(U[i])>1 and len(U[j])>1):
+                    for k in range(self.n_components - 1):
+                        Jc += self.distance(U[i][k], U[j][k], type = "cosine")
+        return Jc
+
+
 
     def pso_init(self):
         #velocity, position init
@@ -48,6 +63,14 @@ class PSO:
             for j in range(len(self.input_space)):
                 lottery = random.randint(0,self.num_clusters-1)
                 X[lottery].append(self.input_space[j])
+            for k in range(self.num_clusters):
+                if len(X[k])==0:
+                    for l in range(self.num_clusters):
+                        if len(X[l])>1:
+                            pos = np.argmax(np.sum(np.square(X[l] - new_position[l]),axis = 1))
+                            X[k].append(X[l][pos])
+                            del(X[l][pos])
+                            break
             Xs.append(X)
         for i in range(self.num_particles):
             for j in range(self.num_clusters):
